@@ -8,6 +8,12 @@
 
 The name honors Mímir, the Norse guardian of wisdom. The mark is an observing eye held inside a carved knot: knowledge is valuable, but never unbounded.
 
+## Capability governance
+
+An agent may register an authorization contract, but it can only create a `draft`. A separate administrator activates it with a local secret; a draft cannot issue a token. Active contracts are not edited in place, and their declared scopes, purposes, access mode, and maximum TTL constrain every issuance.
+
+Capability names are namespaced `snake_case`, for example `calendar.read_availability`. CCP/0.1 accepts read-only capabilities only.
+
 ## Architecture
 
 ```text
@@ -20,6 +26,7 @@ The service uses standard-library Go only. All MVP state is in memory and is res
 ## Run
 
 ```powershell
+$env:MIMIR_ADMIN_TOKEN = "choose-a-local-secret"
 go run ./cmd/mimird
 ```
 
@@ -42,12 +49,14 @@ curl.exe -X POST http://127.0.0.1:8787/v1/policies -H "Content-Type: application
 Request a 20-minute capability (copy `token` from the response):
 
 ```powershell
-curl.exe -X POST http://127.0.0.1:8787/v1/access-requests -H "Content-Type: application/json" -d '{"scopes":["employment.current"],"purpose":"salary_negotiation","ttl":"20m"}'
+curl.exe -X POST http://127.0.0.1:8787/v1/capabilities -H "Content-Type: application/json" -d '{"name":"employment.read_current","scopes":["employment.current"],"purposes":["salary_negotiation"],"max_ttl":"20m","access":"read_only","classification":"sensitive","created_by":"agent_context"}'
+curl.exe -X POST http://127.0.0.1:8787/v1/capabilities/employment.read_current/versions/1/activate -H "Content-Type: application/json" -H "X-Mimir-Admin-Token: choose-a-local-secret" -d '{"actor":"amari"}'
+curl.exe -X POST http://127.0.0.1:8787/v1/access-requests -H "Content-Type: application/json" -d '{"capability":"employment.read_current","purpose":"salary_negotiation","ttl":"20m"}'
 curl.exe http://127.0.0.1:8787/v1/context -H "Authorization: Bearer YOUR_TOKEN"
 curl.exe http://127.0.0.1:8787/v1/audit
 ```
 
-The context response contains `employment.current` but not `finances.balance`.
+The context response contains `employment.current` but not `finances.balance`. A caller cannot substitute arbitrary scopes during the access request.
 
 ## Verify
 

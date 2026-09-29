@@ -3,13 +3,14 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/Rukafuu/Mimir/internal/kernel"
 )
 
-func New(service *kernel.Service) http.Handler {
+func New(service *kernel.Service, adminToken string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -38,6 +39,50 @@ func New(service *kernel.Service) http.Handler {
 		}
 		respond(w, http.StatusCreated, policy)
 	})
+	mux.HandleFunc("POST /v1/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		var definition kernel.CapabilityDefinition
+		if err := decode(r, &definition); err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+		created, err := service.CreateCapability(definition)
+		if err != nil {
+			fail(w, http.StatusBadRequest, err)
+			return
+		}
+		respond(w, http.StatusCreated, created)
+	})
+	mux.HandleFunc("GET /v1/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		respond(w, http.StatusOK, map[string]any{"capabilities": service.CapabilityDefinitions()})
+	})
+	lifecycle := func(status kernel.CapabilityStatus) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if adminToken == "" || r.Header.Get("X-Mimir-Admin-Token") != adminToken {
+				fail(w, http.StatusUnauthorized, errors.New("administrator token is required"))
+				return
+			}
+			var approval struct {
+				Actor string `json:"actor"`
+			}
+			if err := decode(r, &approval); err != nil {
+				fail(w, http.StatusBadRequest, err)
+				return
+			}
+			var version int
+			if _, err := fmt.Sscan(r.PathValue("version"), &version); err != nil {
+				fail(w, http.StatusBadRequest, errors.New("invalid capability version"))
+				return
+			}
+			if err := service.SetCapabilityStatus(r.PathValue("name"), version, status, approval.Actor); err != nil {
+				fail(w, http.StatusConflict, err)
+				return
+			}
+			respond(w, http.StatusOK, map[string]string{"status": string(status)})
+		}
+	}
+	mux.HandleFunc("POST /v1/capabilities/{name}/versions/{version}/activate", lifecycle(kernel.CapabilityActive))
+	mux.HandleFunc("POST /v1/capabilities/{name}/versions/{version}/deprecate", lifecycle(kernel.CapabilityDeprecated))
+	mux.HandleFunc("POST /v1/capabilities/{name}/versions/{version}/revoke", lifecycle(kernel.CapabilityRevoked))
 	mux.HandleFunc("POST /v1/access-requests", func(w http.ResponseWriter, r *http.Request) {
 		var req kernel.AccessRequest
 		if err := decode(r, &req); err != nil {

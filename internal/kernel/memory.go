@@ -9,12 +9,13 @@ type MemoryStore struct {
 	mu           sync.RWMutex
 	sources      map[string]Source
 	policies     []Policy
+	definitions  map[string]map[int]CapabilityDefinition
 	capabilities map[string]Capability
 	audits       []AuditEvent
 }
 
 func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{sources: map[string]Source{}, capabilities: map[string]Capability{}}
+	return &MemoryStore{sources: map[string]Source{}, definitions: map[string]map[int]CapabilityDefinition{}, capabilities: map[string]Capability{}}
 }
 func (m *MemoryStore) AddSource(s Source) error {
 	m.mu.Lock()
@@ -47,6 +48,47 @@ func (m *MemoryStore) Policies() []Policy {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return append([]Policy(nil), m.policies...)
+}
+func (m *MemoryStore) AddCapabilityDefinition(d CapabilityDefinition) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.definitions[d.Name] == nil {
+		m.definitions[d.Name] = map[int]CapabilityDefinition{}
+	}
+	if _, exists := m.definitions[d.Name][d.Version]; exists {
+		return errors.New("capability version already exists")
+	}
+	m.definitions[d.Name][d.Version] = d
+	return nil
+}
+func (m *MemoryStore) CapabilityDefinition(name string, version int) (CapabilityDefinition, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	d, ok := m.definitions[name][version]
+	return d, ok
+}
+func (m *MemoryStore) CapabilityDefinitions() []CapabilityDefinition {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	out := []CapabilityDefinition{}
+	for _, versions := range m.definitions {
+		for _, d := range versions {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+func (m *MemoryStore) SetCapabilityStatus(name string, version int, status CapabilityStatus) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	versions := m.definitions[name]
+	d, ok := versions[version]
+	if !ok {
+		return errors.New("capability version not found")
+	}
+	d.Status = status
+	versions[version] = d
+	return nil
 }
 func (m *MemoryStore) PutCapability(c Capability) {
 	m.mu.Lock()

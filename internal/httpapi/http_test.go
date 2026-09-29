@@ -11,7 +11,7 @@ import (
 )
 
 func TestAccessFlowReturnsMinimalView(t *testing.T) {
-	h := New(kernel.NewService(kernel.NewMemoryStore()))
+	h := New(kernel.NewService(kernel.NewMemoryStore()), "test-admin-token")
 	request := func(method, path, body string) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, bytes.NewBufferString(body))
 		r.Header.Set("Content-Type", "application/json")
@@ -25,7 +25,19 @@ func TestAccessFlowReturnsMinimalView(t *testing.T) {
 	if got := request(http.MethodPost, "/v1/policies", `{"id":"work","effect":"allow","scope":"work.role","purpose":"portfolio"}`); got.Code != http.StatusCreated {
 		t.Fatalf("policy: %d", got.Code)
 	}
-	access := request(http.MethodPost, "/v1/access-requests", `{"scopes":["work.role"],"purpose":"portfolio","ttl":"1m"}`)
+	definition := request(http.MethodPost, "/v1/capabilities", `{"name":"work.read_role","scopes":["work.role"],"purposes":["portfolio"],"max_ttl":"5m","access":"read_only","classification":"internal","created_by":"agent_context"}`)
+	if definition.Code != http.StatusCreated {
+		t.Fatalf("definition: %d: %s", definition.Code, definition.Body.String())
+	}
+	activate := httptest.NewRequest(http.MethodPost, "/v1/capabilities/work.read_role/versions/1/activate", bytes.NewBufferString(`{"actor":"amari"}`))
+	activate.Header.Set("Content-Type", "application/json")
+	activate.Header.Set("X-Mimir-Admin-Token", "test-admin-token")
+	activated := httptest.NewRecorder()
+	h.ServeHTTP(activated, activate)
+	if activated.Code != http.StatusOK {
+		t.Fatalf("activate: %d: %s", activated.Code, activated.Body.String())
+	}
+	access := request(http.MethodPost, "/v1/access-requests", `{"capability":"work.read_role","purpose":"portfolio","ttl":"1m"}`)
 	if access.Code != http.StatusCreated {
 		t.Fatalf("access: %d: %s", access.Code, access.Body.String())
 	}
