@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/context-kernel/context-kernel/internal/kernel"
+	"github.com/Rukafuu/Mimir/internal/kernel"
 )
 
 func New(service *kernel.Service) http.Handler {

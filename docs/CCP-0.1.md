@@ -1,4 +1,4 @@
-# CCP/0.1 — Context Capability Protocol
+# Mímir CCP/0.1 — Context Capability Protocol
 
 ## Status
 

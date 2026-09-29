@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/context-kernel/context-kernel/internal/kernel"
+	"github.com/Rukafuu/Mimir/internal/kernel"
 )
 
 func TestAccessFlowReturnsMinimalView(t *testing.T) {

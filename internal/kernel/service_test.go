@@ -7,7 +7,7 @@ import (
 
 func TestCapabilityReturnsOnlyAllowedSemanticView(t *testing.T) {
 	s := NewService(NewMemoryStore())
-	if err := s.RegisterSource(Source{ID: "mock-profile", Facts: map[string]any{"employment.current": "Context Kernel", "finances.balance": 100}}); err != nil {
+	if err := s.RegisterSource(Source{ID: "mock-profile", Facts: map[string]any{"employment.current": "Mímir", "finances.balance": 100}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.AddPolicy(Policy{ID: "employment", Effect: "allow", Scope: "employment.current", Purpose: "salary_negotiation"}); err != nil {
@@ -21,7 +21,7 @@ func TestCapabilityReturnsOnlyAllowedSemanticView(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(view) != 1 || view["employment.current"] != "Context Kernel" {
+	if len(view) != 1 || view["employment.current"] != "Mímir" {
 		t.Fatalf("unexpected minimal view: %#v", view)
 	}
 }

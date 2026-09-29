@@ -1,3 +1,3 @@
-module github.com/context-kernel/context-kernel
+module github.com/Rukafuu/Mimir
 
 go 1.26.0
